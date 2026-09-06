@@ -20,7 +20,7 @@ type BrandSection = {
   bannerImages?: string[];
 };
 
-const BASE = process.env.NEXT_PUBLIC_API_URL || "";
+const BASE = "";
 
 export default function HomeCategorySections() {
   const [sections, setSections] = useState<BrandSection[]>([]);
@@ -29,7 +29,7 @@ export default function HomeCategorySections() {
   useEffect(() => {
     async function load() {
       try {
-        const settingsRes = await fetch(`${BASE}/api/admin/brands/home-settings`);
+        const settingsRes = await fetch(`/api/admin/brands/home-settings`);
         if (!settingsRes.ok) return;
         const settings: BrandSetting[] = await settingsRes.json();
 
@@ -42,7 +42,7 @@ export default function HomeCategorySections() {
         const results = await Promise.all(
           visible.map(async (s) => {
             const res = await fetch(
-              `${BASE}/api/products?brand=${encodeURIComponent(s.brand)}`
+              `/api/products?brand=${encodeURIComponent(s.brand)}`
             );
             const data = res.ok ? await res.json() : [];
             const raw: Product[] = Array.isArray(data)
