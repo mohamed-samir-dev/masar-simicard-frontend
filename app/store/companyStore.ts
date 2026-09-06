@@ -38,9 +38,7 @@ export const useCompanyStore = create<CompanyStore>((set, get) => ({
       const res = await fetch(`/api/company`);
       if (!res.ok) return;
       const data = await res.json();
-      const fullLogo = data.logo
-        ? (data.logo.startsWith("http") ? data.logo : `${API}${data.logo}`)
-        : "";
+      const fullLogo = data.logo || "";
       set({
         logo: fullLogo,
         nameAr: data.nameAr || "",

@@ -13,11 +13,10 @@ import type { Product } from "./types";
 import { useCartStore } from "../../store/cartStore";
 import { useCartPopupStore } from "../../store/cartPopupStore";
 
-const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
 const resolveImgUrl = (src: string) => {
   if (src.startsWith("http")) return encodeURI(decodeURI(src));
   const path = src.startsWith("/") ? src : "/" + src;
-  return `${API}${encodeURI(decodeURI(path))}`;
+  return `/api/file-proxy?url=${encodeURIComponent(path)}`;
 };
 
 const fmt = (n: number) => n.toLocaleString("en-US");
