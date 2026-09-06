@@ -10,7 +10,7 @@ import { sortProducts } from "../lib/sortProducts";
 import { useProductFilters } from "../(categories)/[slug]/components/useProductFilters";
 import ProductsGrid from "../(categories)/[slug]/components/ProductsGrid";
 
-const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+const API = "";
 
 export default function AllProductsClient() {
   const searchParams = useSearchParams();
