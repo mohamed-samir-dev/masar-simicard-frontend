@@ -12,7 +12,7 @@ import CategoryHero from "./components/CategoryHero";
 import FiltersSidebar from "./components/FiltersSidebar";
 import ProductsGrid from "./components/ProductsGrid";
 
-const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+const API = "";
 
 function filterProducts(products: Product[], slug: string): Product[] {
   const config = slugConfigs[slug];

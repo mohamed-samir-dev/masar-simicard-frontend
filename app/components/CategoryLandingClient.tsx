@@ -18,7 +18,7 @@ import ProductCard from "./products/ProductCard";
 import type { Product } from "./products/types";
 import { sortProducts } from "../lib/sortProducts";
 
-const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+const API = "";
 
 export interface SubCategoryCard {
   slug: string;
