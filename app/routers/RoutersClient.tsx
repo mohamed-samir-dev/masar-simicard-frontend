@@ -13,8 +13,6 @@ import { useProductFilters } from "../(categories)/[slug]/components/useProductF
 import ProductsGrid from "../(categories)/[slug]/components/ProductsGrid";
 import AnimatedBackground from "../components/AnimatedBackground";
 
-const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
-
 const BRANDS = [
   { name: "TP-Link",  border: "border-orange-500/30", bg: "bg-orange-500/10", dot: "bg-orange-400" },
   { name: "Huawei",   border: "border-red-500/30",    bg: "bg-red-500/10",    dot: "bg-red-400"    },
@@ -32,7 +30,7 @@ export default function RoutersClient() {
   const { filters, filtered } = useProductFilters(rawProducts);
 
   useEffect(() => {
-    fetch(`${API}/api/products?category=routers`)
+    fetch(`/api/products?category=routers`)
       .then((r) => r.json())
       .then((data: Product[]) => setRawProducts(sortProducts(data)))
       .catch(console.error)
