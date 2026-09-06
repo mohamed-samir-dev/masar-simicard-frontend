@@ -11,7 +11,6 @@ import ProductImages from "./components/ProductImages";
 import ProductInfo from "./components/ProductInfo";
 import ProductDetails from "./components/ProductDetails";
 
-const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
 
 export default function ProductPageClient({ id }: { id: string }) {
   const router = useRouter();
@@ -21,7 +20,7 @@ export default function ProductPageClient({ id }: { id: string }) {
   const addItem = useCartStore((s) => s.addItem);
 
   useEffect(() => {
-    fetch(`${API}/api/products/${id}`)
+    fetch(`/api/products/${id}`)
       .then((r) => r.json())
       .then(setProduct)
       .catch(console.error)
@@ -51,7 +50,7 @@ export default function ProductPageClient({ id }: { id: string }) {
       </div>
     );
 
-  const resolveImg = (src: string) => src.startsWith("http") ? src : `${API}${src}`;
+  const resolveImg = (src: string) => src.startsWith("http") ? src : src;
   const merged = [...(product.images || []), ...(product.image ? [product.image] : [])];
   const allImages = [...new Set(merged)].map(resolveImg);
 

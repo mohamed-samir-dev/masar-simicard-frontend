@@ -18,8 +18,7 @@ interface CartItemProps {
   onRemove: (id: string) => void;
 }
 
-const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
-const resolveImg = (src: string) => src.startsWith("http") ? src : `${API}${src}`;
+const resolveImg = (src: string) => src.startsWith("http") ? src : src;
 
 export default function CartItem({ product, qty, onUpdateQty, onRemove }: CartItemProps) {
   const price = product.salePrice ?? product.originalPrice ?? product.price;
