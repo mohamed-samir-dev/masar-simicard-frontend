@@ -20,7 +20,7 @@ function getApiBase(): string {
   try {
     const { hostname, origin } = new URL(raw);
     if (!ALLOWED_HOSTS.includes(hostname)) throw new Error(`Blocked host: ${hostname}`);
-    return origin;
+    return origin.replace(/\/+$/, "");
   } catch {
     return "http://localhost:5000";
   }
