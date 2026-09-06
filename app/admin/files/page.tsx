@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { FiUpload, FiLink, FiExternalLink, FiTrash2 } from "react-icons/fi";
 
-type FooterItem = { image: string; linkType: string; link: string; file: string };
+type FooterItem = { _id?: string; image: string; linkType: string; link: string; file: string };
 type Data = { qrImage: string; qrLink: string; qrLinkType: string; qrFile: string; img1: string; link1: string; linkType1: string; file1: string; img2: string; link2: string; linkType2: string; file2: string; footerItems: FooterItem[] };
 
 export default function FilesPage() {
@@ -15,7 +15,12 @@ export default function FilesPage() {
     setMsgs((p) => ({ ...p, [section]: text }));
     setTimeout(() => setMsgs((p) => ({ ...p, [section]: "" })), 3000);
   }
-  const [uploading, setUploading] = useState<string | null>(null);
+
+  // Set-based uploading state — supports concurrent uploads without race condition
+  const [uploadingSet, setUploadingSet] = useState<Set<string>>(new Set());
+  function startUploading(key: string) { setUploadingSet((p) => new Set(p).add(key)); }
+  function stopUploading(key: string) { setUploadingSet((p) => { const n = new Set(p); n.delete(key); return n; }); }
+  function isUploading(key: string) { return uploadingSet.has(key); }
 
   function openFile(url: string) {
     const rawUrl = url.replace("/image/upload/", "/raw/upload/").replace(/\/fl_attachment:[^/]+\//, "/");
@@ -38,108 +43,132 @@ export default function FilesPage() {
     fetch(`/api/admin/company`, { credentials: "include" })
       .then((r) => r.json())
       .then((d) => {
-        const normalize = (item: Partial<FooterItem>): FooterItem => ({ image: item.image || "", linkType: item.linkType || (item.file ? "file" : "link"), link: item.link || "", file: item.file || "" });
+        const normalize = (item: Partial<FooterItem>): FooterItem => ({ _id: (item as FooterItem & { _id?: string })._id, image: item.image || "", linkType: item.linkType || (item.file ? "file" : "link"), link: item.link || "", file: item.file || "" });
         const items = (d.footerItems && d.footerItems.length > 0
           ? d.footerItems
           : [{}, {}, {}]).map(normalize);
-        setData({ qrImage: d.qrImage || "", qrLink: d.qrLink || "", qrLinkType: d.qrLinkType || (d.qrFile ? "file" : "link"), qrFile: d.qrFile || "", img1: d.img1 || "", link1: d.link1 || "", linkType1: d.linkType1 || (d.file1 ? "file" : "link"), file1: d.file1 || "", img2: d.img2 || "", link2: d.link2 || "", linkType2: d.linkType2 || (d.file2 ? "file" : "link"), file2: d.file2 || "", footerItems: items });
-      });
+        setData({ qrImage: d.qrImage || "", qrLink: d.qrLink || "", qrLinkType: d.qrLinkType || (d.qrFile ? "file" : "link"), qrFile: d.qrFile || "", img1: d.img1 || "", link1: d.link1 || "", linkType1: d.link1Type || (d.file1 ? "file" : "link"), file1: d.file1 || "", img2: d.img2 || "", link2: d.link2 || "", linkType2: d.link2Type || (d.file2 ? "file" : "link"), file2: d.file2 || "", footerItems: items });
+      })
+      .catch(() => showMsg("load", "❌ فشل تحميل البيانات"));
   }, []);
 
   async function uploadQr(file: File) {
-    setUploading("qr");
-    const fd = new FormData();
-    fd.append("image", file);
-    const r = await fetch(`/api/admin/company/footer-image/qrImage`, { method: "POST", credentials: "include", body: fd });
-    const json = await r.json();
-    if (json.url) { setData((p) => ({ ...p, qrImage: json.url })); bumpKey("qr"); }
-    setUploading(null);
+    startUploading("qr");
+    try {
+      const fd = new FormData();
+      fd.append("image", file);
+      const r = await fetch(`/api/admin/company/footer-image/qrImage`, { method: "POST", credentials: "include", body: fd });
+      const json = await r.json();
+      if (!r.ok) { showMsg("qr", `❌ ${json.error || "فشل الرفع"}`); return; }
+      if (json.url) { setData((p) => ({ ...p, qrImage: json.url })); bumpKey("qr"); }
+    } catch { showMsg("qr", "❌ خطأ في الشبكة"); }
+    finally { stopUploading("qr"); }
   }
 
   async function uploadImg1(file: File) {
-    setUploading("img1");
-    const fd = new FormData();
-    fd.append("image", file);
-    const r = await fetch(`/api/admin/company/footer-image/img1`, { method: "POST", credentials: "include", body: fd });
-    const json = await r.json();
-    if (json.url) { setData((p) => ({ ...p, img1: json.url })); bumpKey("img1"); }
-    setUploading(null);
+    startUploading("img1");
+    try {
+      const fd = new FormData();
+      fd.append("image", file);
+      const r = await fetch(`/api/admin/company/footer-image/img1`, { method: "POST", credentials: "include", body: fd });
+      const json = await r.json();
+      if (!r.ok) { showMsg("s1", `❌ ${json.error || "فشل الرفع"}`); return; }
+      if (json.url) { setData((p) => ({ ...p, img1: json.url })); bumpKey("img1"); }
+    } catch { showMsg("s1", "❌ خطأ في الشبكة"); }
+    finally { stopUploading("img1"); }
   }
 
   async function uploadImg2(file: File) {
-    setUploading("img2");
-    const fd = new FormData();
-    fd.append("image", file);
-    const r = await fetch(`/api/admin/company/footer-image/img2`, { method: "POST", credentials: "include", body: fd });
-    const json = await r.json();
-    if (json.url) { setData((p) => ({ ...p, img2: json.url })); bumpKey("img2"); }
-    setUploading(null);
+    startUploading("img2");
+    try {
+      const fd = new FormData();
+      fd.append("image", file);
+      const r = await fetch(`/api/admin/company/footer-image/img2`, { method: "POST", credentials: "include", body: fd });
+      const json = await r.json();
+      if (!r.ok) { showMsg("s2", `❌ ${json.error || "فشل الرفع"}`); return; }
+      if (json.url) { setData((p) => ({ ...p, img2: json.url })); bumpKey("img2"); }
+    } catch { showMsg("s2", "❌ خطأ في الشبكة"); }
+    finally { stopUploading("img2"); }
   }
 
   async function uploadQrFile(file: File) {
-    setUploading("qrFile");
-    const fd = new FormData();
-    fd.append("file", file);
-    const r = await fetch(`/api/admin/company/footer-file/qrFile`, { method: "POST", credentials: "include", body: fd });
-    const json = await r.json();
-    if (json.url) setData((p) => ({ ...p, qrFile: json.url }));
-    setUploading(null);
+    startUploading("qrFile");
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const r = await fetch(`/api/admin/company/footer-file/qrFile`, { method: "POST", credentials: "include", body: fd });
+      const json = await r.json();
+      if (!r.ok) { showMsg("qr", `❌ ${json.error || "فشل الرفع"}`); return; }
+      if (json.url) setData((p) => ({ ...p, qrFile: json.url }));
+    } catch { showMsg("qr", "❌ خطأ في الشبكة"); }
+    finally { stopUploading("qrFile"); }
   }
 
   async function uploadFile1(file: File) {
-    setUploading("file1");
-    const fd = new FormData();
-    fd.append("file", file);
-    const r = await fetch(`/api/admin/company/footer-file/file1`, { method: "POST", credentials: "include", body: fd });
-    const json = await r.json();
-    if (json.url) setData((p) => ({ ...p, file1: json.url }));
-    setUploading(null);
+    startUploading("file1");
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const r = await fetch(`/api/admin/company/footer-file/file1`, { method: "POST", credentials: "include", body: fd });
+      const json = await r.json();
+      if (!r.ok) { showMsg("s1", `❌ ${json.error || "فشل الرفع"}`); return; }
+      if (json.url) setData((p) => ({ ...p, file1: json.url }));
+    } catch { showMsg("s1", "❌ خطأ في الشبكة"); }
+    finally { stopUploading("file1"); }
   }
 
   async function uploadFile2(file: File) {
-    setUploading("file2");
-    const fd = new FormData();
-    fd.append("file", file);
-    const r = await fetch(`/api/admin/company/footer-file/file2`, { method: "POST", credentials: "include", body: fd });
-    const json = await r.json();
-    if (json.url) setData((p) => ({ ...p, file2: json.url }));
-    setUploading(null);
+    startUploading("file2");
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const r = await fetch(`/api/admin/company/footer-file/file2`, { method: "POST", credentials: "include", body: fd });
+      const json = await r.json();
+      if (!r.ok) { showMsg("s2", `❌ ${json.error || "فشل الرفع"}`); return; }
+      if (json.url) setData((p) => ({ ...p, file2: json.url }));
+    } catch { showMsg("s2", "❌ خطأ في الشبكة"); }
+    finally { stopUploading("file2"); }
   }
 
   async function uploadItemImg(index: number, file: File) {
-    setUploading(`img-${index}`);
-    const fd = new FormData();
-    fd.append("image", file);
-    const r = await fetch(`/api/admin/company/footer-items/image/${index}`, { method: "POST", credentials: "include", body: fd });
-    const json = await r.json();
-    if (json.url) {
-      setData((p) => {
-        const items = [...p.footerItems];
-        items[index] = { ...items[index], image: json.url };
-        return { ...p, footerItems: items };
-      });
-      bumpKey(`img-${index}`);
-    }
-    setUploading(null);
+    const key = `img-${index}`;
+    startUploading(key);
+    try {
+      const fd = new FormData();
+      fd.append("image", file);
+      const r = await fetch(`/api/admin/company/footer-items/image/${index}`, { method: "POST", credentials: "include", body: fd });
+      const json = await r.json();
+      if (!r.ok) { showMsg("items", `❌ ${json.error || "فشل الرفع"}`); return; }
+      if (json.url) {
+        setData((p) => {
+          const items = [...p.footerItems];
+          items[index] = { ...items[index], image: json.url };
+          return { ...p, footerItems: items };
+        });
+        bumpKey(key);
+      }
+    } catch { showMsg("items", "❌ خطأ في الشبكة"); }
+    finally { stopUploading(key); }
   }
 
   async function uploadItemFile(index: number, file: File) {
-    setUploading(`file-${index}`);
-    const fd = new FormData();
-    fd.append("file", file);
-    const r = await fetch(`/api/admin/company/footer-items/file/${index}`, { method: "POST", credentials: "include", body: fd });
-    const json = await r.json();
-    if (json.url) setData((p) => {
-      const items = [...p.footerItems];
-      items[index] = { ...items[index], file: json.url };
-      return { ...p, footerItems: items };
-    });
-    setUploading(null);
+    const key = `file-${index}`;
+    startUploading(key);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const r = await fetch(`/api/admin/company/footer-items/file/${index}`, { method: "POST", credentials: "include", body: fd });
+      const json = await r.json();
+      if (!r.ok) { showMsg("items", `❌ ${json.error || "فشل الرفع"}`); return; }
+      if (json.url) setData((p) => {
+        const items = [...p.footerItems];
+        items[index] = { ...items[index], file: json.url };
+        return { ...p, footerItems: items };
+      });
+    } catch { showMsg("items", "❌ خطأ في الشبكة"); }
+    finally { stopUploading(key); }
   }
 
- 
-
- 
   function updateItem(index: number, field: keyof FooterItem, value: string) {
     setData((p) => {
       const items = [...p.footerItems];
@@ -148,15 +177,27 @@ export default function FilesPage() {
     });
   }
 
+  async function deleteFile(field: "qrFile" | "file1" | "file2", section: string) {
+    try {
+      const r = await fetch(`/api/admin/company/footer-file-delete/${field}`, { method: "DELETE", credentials: "include" });
+      const json = await r.json();
+      if (!r.ok) { showMsg(section, `❌ ${json.error || "فشل الحذف"}`); return; }
+      setData((p) => ({ ...p, [field]: "" }));
+    } catch { showMsg(section, "❌ خطأ في الشبكة"); }
+  }
+
   async function saveSection(section: string, body: object) {
     setSavingSection(section);
-    const r = await fetch(`/api/admin/company`, {
-      method: "PUT", credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    setSavingSection(null);
-    showMsg(section, r.ok ? "✅ تم الحفظ" : "❌ حدث خطأ");
+    try {
+      const r = await fetch(`/api/admin/company`, {
+        method: "PUT", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const json = await r.json();
+      showMsg(section, r.ok ? "✅ تم الحفظ" : `❌ ${json.error || "حدث خطأ"}`);
+    } catch { showMsg(section, "❌ خطأ في الشبكة"); }
+    finally { setSavingSection(null); }
   }
 
   return (
@@ -184,7 +225,7 @@ export default function FilesPage() {
           <div className="relative shrink-0">
             <div onClick={() => qrRef.current?.click()}
               className="relative w-20 h-20 rounded-xl border-2 border-dashed border-gray-300 bg-white flex items-center justify-center cursor-pointer hover:border-blue-500 hover:bg-blue-50 transition-all group overflow-hidden">
-              {uploading === "qr" ? (
+              {isUploading("qr") ? (
                 <span className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
               ) : data.qrImage ? (
                 <>
@@ -238,9 +279,9 @@ export default function FilesPage() {
             ) : (
               <div key="qr-file" className="flex flex-wrap items-center gap-2">
                 <button onClick={() => qrFileRef.current?.click()}
-                  disabled={uploading === "qrFile"}
+                  disabled={isUploading("qrFile")}
                   className="flex items-center gap-1.5 px-3 py-2 bg-blue-50 text-blue-600 text-sm font-medium rounded-lg hover:bg-blue-100 border border-blue-200 transition-colors disabled:opacity-50 shrink-0">
-                  {uploading === "qrFile"
+                  {isUploading("qrFile")
                     ? <span className="w-3.5 h-3.5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
                     : <FiUpload size={13} />}
                   رفع ملف
@@ -254,7 +295,7 @@ export default function FilesPage() {
                       <FiExternalLink size={13} />
                       عرض الملف
                     </button>
-                    <button onClick={() => setData((p) => ({ ...p, qrFile: "" }))}
+                    <button onClick={() => deleteFile("qrFile", "qr")}
                       className="text-red-400 hover:text-red-600 text-xs hover:underline">
                       حذف
                     </button>
@@ -292,7 +333,7 @@ export default function FilesPage() {
                 <div className="relative shrink-0">
                   <div onClick={() => imgRefs.current[i]?.click()}
                     className="relative w-20 h-20 rounded-xl border-2 border-dashed border-gray-300 bg-white flex items-center justify-center cursor-pointer hover:border-blue-500 hover:bg-blue-50 transition-all group overflow-hidden">
-                    {uploading === `img-${i}` ? (
+                    {isUploading(`img-${i}`) ? (
                       <span className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
                     ) : item.image ? (
                       <>
@@ -349,9 +390,9 @@ export default function FilesPage() {
                   ) : (
                     <div key={`file-input-${i}`} className="flex flex-wrap items-center gap-2">
                       <button onClick={() => fileRefs.current[i]?.click()}
-                        disabled={uploading === `file-${i}`}
+                        disabled={isUploading(`file-${i}`)}
                         className="flex items-center gap-1.5 px-3 py-2 bg-blue-50 text-blue-600 text-sm font-medium rounded-lg hover:bg-blue-100 border border-blue-200 transition-colors disabled:opacity-50 shrink-0">
-                        {uploading === `file-${i}`
+                        {isUploading(`file-${i}`)
                           ? <span className="w-3.5 h-3.5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
                           : <FiUpload size={13} />}
                         رفع ملف
@@ -400,7 +441,7 @@ export default function FilesPage() {
           <div className="relative shrink-0">
             <div onClick={() => img1Ref.current?.click()}
               className="relative w-20 h-20 rounded-xl border-2 border-dashed border-gray-300 bg-white flex items-center justify-center cursor-pointer hover:border-blue-500 hover:bg-blue-50 transition-all group overflow-hidden">
-              {uploading === "img1" ? (
+              {isUploading("img1") ? (
                 <span className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
               ) : data.img1 ? (
                 <>
@@ -453,9 +494,9 @@ export default function FilesPage() {
             ) : (
               <div key="s1-file" className="flex flex-wrap items-center gap-2">
                 <button onClick={() => fileRef1.current?.click()}
-                  disabled={uploading === "file1"}
+                  disabled={isUploading("file1")}
                   className="flex items-center gap-1.5 px-3 py-2 bg-blue-50 text-blue-600 text-sm font-medium rounded-lg hover:bg-blue-100 border border-blue-200 transition-colors disabled:opacity-50 shrink-0">
-                  {uploading === "file1"
+                  {isUploading("file1")
                     ? <span className="w-3.5 h-3.5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
                     : <FiUpload size={13} />}
                   رفع ملف
@@ -469,7 +510,7 @@ export default function FilesPage() {
                       <FiExternalLink size={13} />
                       عرض الملف
                     </button>
-                    <button onClick={() => setData((p) => ({ ...p, file1: "" }))}
+                    <button onClick={() => deleteFile("file1", "s1")}
                       className="text-red-400 hover:text-red-600 text-xs hover:underline">
                       حذف
                     </button>
@@ -497,7 +538,7 @@ export default function FilesPage() {
           <div className="relative shrink-0">
             <div onClick={() => img2Ref.current?.click()}
               className="relative w-20 h-20 rounded-xl border-2 border-dashed border-gray-300 bg-white flex items-center justify-center cursor-pointer hover:border-blue-500 hover:bg-blue-50 transition-all group overflow-hidden">
-              {uploading === "img2" ? (
+              {isUploading("img2") ? (
                 <span className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
               ) : data.img2 ? (
                 <>
@@ -550,9 +591,9 @@ export default function FilesPage() {
             ) : (
               <div key="s2-file" className="flex flex-wrap items-center gap-2">
                 <button onClick={() => fileRef2.current?.click()}
-                  disabled={uploading === "file2"}
+                  disabled={isUploading("file2")}
                   className="flex items-center gap-1.5 px-3 py-2 bg-blue-50 text-blue-600 text-sm font-medium rounded-lg hover:bg-blue-100 border border-blue-200 transition-colors disabled:opacity-50 shrink-0">
-                  {uploading === "file2"
+                  {isUploading("file2")
                     ? <span className="w-3.5 h-3.5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
                     : <FiUpload size={13} />}
                   رفع ملف
@@ -566,7 +607,7 @@ export default function FilesPage() {
                       <FiExternalLink size={13} />
                       عرض الملف
                     </button>
-                    <button onClick={() => setData((p) => ({ ...p, file2: "" }))}
+                    <button onClick={() => deleteFile("file2", "s2")}
                       className="text-red-400 hover:text-red-600 text-xs hover:underline">
                       حذف
                     </button>

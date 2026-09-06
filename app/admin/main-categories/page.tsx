@@ -7,7 +7,7 @@ import DeleteModal from "./components/DeleteModal";
 
 export default function MainCategoriesPage() {
   const {
-    categories, filtered, search, setSearch,
+    categories, filtered, search, setSearch, fetchLoading,
     showModal, setShowModal, name, setName, error, loading, handleAdd,
     editCat, setEditCat, editName, setEditName, editError, editLoading, handleEdit,
     confirmDelete, setConfirmDelete, confirmDeleteAction,
@@ -29,6 +29,7 @@ export default function MainCategoriesPage() {
         categories={categories}
         filtered={filtered}
         search={search}
+        loading={fetchLoading}
         onSearchChange={setSearch}
         onEdit={(cat) => { setEditCat(cat); setEditName(cat.name); }}
         onDelete={setConfirmDelete}

@@ -14,30 +14,45 @@ export default function CategoryItemsPage() {
   const [maxInput, setMaxInput] = useState(4);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
-  // image upload state
   const [categories, setCategories] = useState<CatImage[]>([]);
   const [selectedCat, setSelectedCat] = useState("");
   const [preview, setPreview] = useState("");
   const [uploading, setUploading] = useState(false);
   const [hasFile, setHasFile] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const previewUrlRef = useRef<string>("");
 
   useEffect(() => {
     Promise.all([
       apiFetch("/api/admin/sub-categories", { credentials: "include" }).then((r) => r.json()),
       apiFetch("/api/admin/sub-categories/settings", { credentials: "include" }).then((r) => r.json()),
-      apiFetch("/api/admin/sub-categories/settings/max", { credentials: "include" }).then((r) => r.json()),
       apiFetch("/api/admin/sub-categories/public").then((r) => r.json()),
-    ]).then(([subs, sets, maxData, cats]) => {
-      setItems(subs);
-      setSettings(sets);
-      const m = maxData?.max ?? 4;
-      setMax(m);
-      setMaxInput(m);
-      setCategories(cats);
-      setLoading(false);
-    });
+    ])
+      .then(([subs, settingsData, cats]) => {
+        setItems(subs);
+        setSettings(settingsData.settings ?? settingsData);
+        const m = settingsData.max ?? 4;
+        setMax(m);
+        setMaxInput(m);
+        setCategories(cats);
+        setLoading(false);
+      })
+      .catch(() => {
+        setError(true);
+        setLoading(false);
+        toast.error("فشل تحميل البيانات، حاول مجدداً");
+      });
+  }, []);
+
+  // تنظيف الـ object URL عند unmount أو تغيير الصورة
+  useEffect(() => {
+    return () => {
+      if (previewUrlRef.current) {
+        URL.revokeObjectURL(previewUrlRef.current);
+      }
+    };
   }, []);
 
   async function handleSaveMax() {
@@ -59,7 +74,23 @@ export default function CategoryItemsPage() {
     const file = e.target.files?.[0];
     setHasFile(!!file);
     if (!file) return;
-    setPreview(URL.createObjectURL(file));
+    // تنظيف الـ URL القديم قبل إنشاء جديد
+    if (previewUrlRef.current) {
+      URL.revokeObjectURL(previewUrlRef.current);
+    }
+    const url = URL.createObjectURL(file);
+    previewUrlRef.current = url;
+    setPreview(url);
+  }
+
+  function resetFileState() {
+    if (previewUrlRef.current) {
+      URL.revokeObjectURL(previewUrlRef.current);
+      previewUrlRef.current = "";
+    }
+    setPreview("");
+    setHasFile(false);
+    if (fileRef.current) fileRef.current.value = "";
   }
 
   async function handleUploadImage() {
@@ -79,9 +110,7 @@ export default function CategoryItemsPage() {
     if (!res.ok) return toast.error("حدث خطأ أثناء الرفع");
     const { url } = await res.json();
     setCategories((prev) => prev.map((c) => c.name === selectedCat ? { ...c, image: url } : c));
-    setPreview("");
-    setHasFile(false);
-    if (fileRef.current) fileRef.current.value = "";
+    resetFileState();
     toast.success("تم رفع الصورة بنجاح ✅");
   }
 
@@ -94,6 +123,20 @@ export default function CategoryItemsPage() {
       const item = items.find((i) => i.category === s.category && i.name === s.subCategory);
       return { ...s, count: item?.count ?? 0 };
     });
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 gap-4">
+        <p className="text-red-500 font-semibold">فشل تحميل البيانات</p>
+        <button
+          onClick={() => window.location.reload()}
+          className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700"
+        >
+          إعادة المحاولة
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -112,7 +155,10 @@ export default function CategoryItemsPage() {
           min={1}
           max={20}
           value={maxInput}
-          onChange={(e) => setMaxInput(parseInt(e.target.value) || 1)}
+          onChange={(e) => {
+            const val = parseInt(e.target.value);
+            setMaxInput(isNaN(val) ? 1 : Math.max(1, val));
+          }}
           className="w-20 border border-gray-300 rounded-lg px-3 py-1.5 text-sm text-center focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
         <button
@@ -137,7 +183,7 @@ export default function CategoryItemsPage() {
             <label className="text-xs text-gray-500">اختر التصنيف</label>
             <select
               value={selectedCat}
-              onChange={(e) => { setSelectedCat(e.target.value); setPreview(""); setHasFile(false); if (fileRef.current) fileRef.current.value = ""; }}
+              onChange={(e) => { setSelectedCat(e.target.value); resetFileState(); }}
               className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[160px]"
             >
               <option value="">-- اختر --</option>
@@ -154,7 +200,7 @@ export default function CategoryItemsPage() {
               )}
               <div className="flex flex-col gap-1">
                 <label className="text-xs text-gray-500">ارفع صورة جديدة</label>
-                <input ref={fileRef} type="file" accept="image/*" onChange={handleFileChange}
+                <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif" onChange={handleFileChange}
                   className="text-sm text-gray-600 file:mr-2 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-sm file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" />
               </div>
               <button

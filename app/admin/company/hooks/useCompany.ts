@@ -1,19 +1,27 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { useCompanyStore } from "../../../store/companyStore";
 import { API, defaultData, toFullUrl } from "../constants";
 import type { CompanyData } from "../types";
 
 export function useCompany() {
-  const { setLogo } = useCompanyStore();
+  const { setLogo, setCompanyData } = useCompanyStore();
   const [data, setData] = useState<CompanyData>(defaultData);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
-    fetch(`/api/admin/company`)
-      .then((r) => r.json())
+    // Cancel any in-flight request if component unmounts
+    abortRef.current = new AbortController();
+    const signal = abortRef.current.signal;
+
+    fetch(`/api/admin/company`, { credentials: "include", signal })
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
       .then((res) => {
         const imageKeys = ["logo", "header", "footer", "stamp", "cancelStamp"];
         const merged: CompanyData = { ...defaultData };
@@ -24,14 +32,23 @@ export function useCompany() {
         }
         setData(merged);
       })
-      .catch(() => toast.error("فشل تحميل بيانات الشركة"))
-      .finally(() => setLoading(false));
+      .catch((err) => {
+        if (err.name === "AbortError") return; // unmount — ignore
+        toast.error("فشل تحميل بيانات الشركة");
+      })
+      .finally(() => {
+        if (!signal.aborted) setLoading(false);
+      });
+
+    return () => {
+      abortRef.current?.abort();
+    };
   }, []);
 
-  const handleChange = (key: string, value: string) =>
-    setData((prev) => ({ ...prev, [key]: value }));
+  const handleChange = useCallback((key: string, value: string) =>
+    setData((prev) => ({ ...prev, [key]: value })), []);
 
-  const handleImageChange = async (key: string, file: File): Promise<void> => {
+  const handleImageChange = useCallback(async (key: string, file: File): Promise<void> => {
     const formData = new FormData();
     formData.append("image", file);
     try {
@@ -43,39 +60,39 @@ export function useCompany() {
       const json = await res.json();
       if (!res.ok) { toast.error(json.error || "فشل رفع الصورة"); return; }
       const fullUrl = json.url.startsWith("http") ? json.url : `${API}${json.url}`;
-      handleChange(key, fullUrl);
-      if (key === "logo") { setLogo(fullUrl); }
+      setData((prev) => ({ ...prev, [key]: fullUrl }));
+      if (key === "logo") setLogo(fullUrl);
       toast.success("تم رفع الصورة");
     } catch {
       toast.error("فشل رفع الصورة");
     }
-  };
+  }, [setLogo]);
 
-  const handleImageDelete = async (key: string): Promise<void> => {
+  const handleImageDelete = useCallback(async (key: string): Promise<void> => {
     try {
       const res = await fetch(`/api/admin/company/image/${key}`, {
         method: "DELETE",
         credentials: "include",
       });
       if (!res.ok) { toast.error("فشل حذف الصورة"); return; }
-      handleChange(key, "");
+      setData((prev) => ({ ...prev, [key]: "" }));
       if (key === "logo") setLogo("");
       toast.success("تم حذف الصورة");
     } catch {
       toast.error("فشل حذف الصورة");
     }
-  };
+  }, [setLogo]);
 
-  const handleSave = async () => {
+  const handleSave = useCallback(async () => {
     setSaving(true);
     try {
-      // Only send text fields — images are managed via separate upload/delete endpoints
       const IMAGE_KEYS = ["logo", "header", "footer", "stamp", "cancelStamp"];
       const textPayload = Object.fromEntries(
         Object.entries(data).filter(([k]) => !IMAGE_KEYS.includes(k))
       );
       const res = await fetch(`/api/admin/company`, {
         method: "PUT",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(textPayload),
       });
@@ -84,14 +101,28 @@ export function useCompany() {
         toast.error(json.error || "فشل الحفظ");
         return;
       }
-      await fetch("/api/revalidate?tag=company", { method: "POST" });
+
+      // Update the global store so Navbar logo/name stay in sync — no extra fetch
+      setCompanyData({
+        nameAr: data.nameAr || "",
+        nameEn: data.nameEn || "",
+        phone: data.phone || "",
+        whatsapp: data.whatsapp || "",
+        email: data.email || "",
+        website: data.website || "",
+        details: data.details || "",
+      });
+
+      // Revalidate Next.js cache tag so Server Components re-fetch on next request
+      fetch("/api/revalidate?tag=company", { method: "POST" }).catch(() => {});
+
       toast.success("تم حفظ بيانات الشركة");
     } catch {
       toast.error("فشل الحفظ");
     } finally {
       setSaving(false);
     }
-  };
+  }, [data, setCompanyData]);
 
   return { data, loading, saving, handleChange, handleImageChange, handleImageDelete, handleSave };
 }

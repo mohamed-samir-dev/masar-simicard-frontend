@@ -1,34 +1,54 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import toast from "react-hot-toast";
 import { apiFetch } from "../../lib/api";
 
 type Brand = { name: string; count: number };
 type BrandSetting = { brand: string; showInHome: boolean; order: number; bannerImages?: string[] };
 
+const MAX_BANNER_SIZE_MB = 5;
+const PAGE_SIZE = 10;
+
+function useDebounce<T extends (...args: Parameters<T>) => void>(fn: T, delay: number) {
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  return useCallback((...args: Parameters<T>) => {
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(() => fn(...args), delay);
+  }, [fn, delay]);
+}
+
 export default function SubCategoriesPage() {
   const [brands, setBrands] = useState<Brand[]>([]);
   const [settings, setSettings] = useState<BrandSetting[]>([]);
   const [search, setSearch] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
-  const PAGE_SIZE = 10;
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
   function getSetting(brand: string): BrandSetting | undefined {
     return settings.find((s) => s.brand === brand);
   }
 
   async function fetchData() {
-    const [r1, r2] = await Promise.all([
-      apiFetch("/api/admin/brands", { credentials: "include" }),
-      apiFetch("/api/admin/brands/settings", { credentials: "include" }),
-    ]);
-    if (r1.ok) setBrands(await r1.json());
-    if (r2.ok) setSettings(await r2.json());
+    setLoading(true);
+    setError(false);
+    try {
+      const [r1, r2] = await Promise.all([
+        apiFetch("/api/admin/brands", { credentials: "include" }),
+        apiFetch("/api/admin/brands/settings", { credentials: "include" }),
+      ]);
+      if (!r1.ok || !r2.ok) throw new Error();
+      setBrands(await r1.json());
+      setSettings(await r2.json());
+    } catch {
+      setError(true);
+      toast.error("فشل تحميل البيانات");
+    } finally {
+      setLoading(false);
+    }
   }
 
-  useEffect(() => {
-    (async () => { await fetchData(); })();
-  }, []);
+  useEffect(() => { fetchData(); }, []);
 
   async function handleToggle(brand: string) {
     const res = await apiFetch("/api/admin/brands/settings/toggle", {
@@ -47,7 +67,7 @@ export default function SubCategoriesPage() {
     toast.success(showInHome ? "سيظهر في الرئيسية ✅" : "تم الإخفاء من الرئيسية");
   }
 
-  async function handleOrderChange(brand: string, order: number) {
+  const sendOrderChange = useCallback(async (brand: string, order: number) => {
     await apiFetch("/api/admin/brands/settings/order", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -59,9 +79,14 @@ export default function SubCategoriesPage() {
       if (exists) return prev.map((s) => s.brand === brand ? { ...s, order } : s);
       return [...prev, { brand, showInHome: false, order }];
     });
-  }
+  }, []);
+
+  const debouncedOrderChange = useDebounce(sendOrderChange, 600);
 
   async function handleBannerUpload(brand: string, file: File) {
+    if (file.size > MAX_BANNER_SIZE_MB * 1024 * 1024) {
+      return toast.error(`حجم الصورة يجب أن يكون أقل من ${MAX_BANNER_SIZE_MB}MB`);
+    }
     const form = new FormData();
     form.append("image", file);
     const res = await apiFetch(`/api/admin/brands/banner/${encodeURIComponent(brand)}`, {
@@ -80,6 +105,7 @@ export default function SubCategoriesPage() {
   }
 
   async function handleBannerDelete(brand: string, url: string) {
+    if (!confirm("هل أنت متأكد من حذف هذا البانر؟")) return;
     const res = await apiFetch(`/api/admin/brands/banner/${encodeURIComponent(brand)}`, {
       method: "DELETE",
       credentials: "include",
@@ -94,6 +120,26 @@ export default function SubCategoriesPage() {
   const filtered = brands.filter((b) => b.name.includes(search));
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
   const paginated = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
+  if (loading) {
+    return (
+      <div className="space-y-4">
+        <div className="h-8 w-40 bg-gray-200 rounded animate-pulse" />
+        <div className="h-64 bg-white rounded-xl shadow animate-pulse" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 gap-4">
+        <p className="text-gray-500 text-sm">فشل تحميل البيانات</p>
+        <button onClick={fetchData} className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700">
+          إعادة المحاولة
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -153,16 +199,16 @@ export default function SubCategoriesPage() {
                         type="checkbox"
                         checked={setting?.showInHome ?? false}
                         onChange={() => handleToggle(brand.name)}
-                        disabled={false}
-                        className="w-4 h-4 accent-blue-600 cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
+                        className="w-4 h-4 accent-blue-600 cursor-pointer"
                       />
                     </td>
                     <td className="px-2 sm:px-4 py-3 text-center">
                       <input
                         type="number"
                         min={0}
+                        key={`${brand.name}-${setting?.order ?? 0}`}
                         defaultValue={setting?.order ?? 0}
-                        onBlur={(e) => handleOrderChange(brand.name, parseInt(e.target.value) || 0)}
+                        onChange={(e) => debouncedOrderChange(brand.name, parseInt(e.target.value) || 0)}
                         disabled={!setting?.showInHome}
                         className="w-16 border border-gray-300 rounded px-2 py-1 text-xs text-center text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-40 disabled:cursor-not-allowed"
                       />

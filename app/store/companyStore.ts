@@ -2,7 +2,7 @@ import { create } from "zustand";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
 
-interface CompanyStore {
+interface CompanyPublicData {
   logo: string;
   nameAr: string;
   nameEn: string;
@@ -11,9 +11,14 @@ interface CompanyStore {
   email: string;
   website: string;
   details: string;
+}
+
+interface CompanyStore extends CompanyPublicData {
   fetched: boolean;
   fetchCompany: () => Promise<void>;
   setLogo: (url: string) => void;
+  setCompanyData: (data: Partial<CompanyPublicData>) => void;
+  resetFetched: () => void;
 }
 
 export const useCompanyStore = create<CompanyStore>((set, get) => ({
@@ -26,10 +31,12 @@ export const useCompanyStore = create<CompanyStore>((set, get) => ({
   website: "",
   details: "",
   fetched: false,
+
   fetchCompany: async () => {
     if (get().fetched) return;
     try {
       const res = await fetch(`/api/company`);
+      if (!res.ok) return;
       const data = await res.json();
       const fullLogo = data.logo
         ? (data.logo.startsWith("http") ? data.logo : `${API}${data.logo}`)
@@ -45,9 +52,18 @@ export const useCompanyStore = create<CompanyStore>((set, get) => ({
         details: data.details || "",
         fetched: true,
       });
-    } catch (e) { console.error(e); }
+    } catch (e) {
+      console.error("[companyStore] fetchCompany failed:", e);
+    }
   },
+
   setLogo: (url) => set({ logo: url }),
+
+  // Update store fields after a successful Save — no extra fetch needed
+  setCompanyData: (data) => set((prev) => ({ ...prev, ...data })),
+
+  // Allow re-fetch (e.g. after logout/login)
+  resetFetched: () => set({ fetched: false }),
 }));
 
 // backward compat alias

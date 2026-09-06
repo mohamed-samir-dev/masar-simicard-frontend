@@ -17,12 +17,13 @@ interface CategoriesTableProps {
   categories: Category[];
   filtered: Category[];
   search: string;
+  loading?: boolean;
   onSearchChange: (v: string) => void;
   onEdit: (cat: Category) => void;
   onDelete: (name: string) => void;
 }
 
-export default function CategoriesTable({ categories, filtered, search, onSearchChange, onEdit, onDelete }: CategoriesTableProps) {
+export default function CategoriesTable({ categories, filtered, search, loading, onSearchChange, onEdit, onDelete }: CategoriesTableProps) {
   return (
     <div className="bg-white rounded-xl shadow overflow-hidden">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-3 sm:px-4 py-3 border-b border-gray-100">
@@ -45,24 +46,36 @@ export default function CategoriesTable({ categories, filtered, search, onSearch
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {filtered.map((cat, i) => (
-              <tr key={cat.name} className="hover:bg-gray-50">
-                <td className="px-3 sm:px-4 py-3 text-gray-400 font-medium text-xs sm:text-sm">{i + 1}</td>
-                <td className="px-3 sm:px-4 py-3 font-medium text-gray-800 text-sm sm:text-base">{cat.name}</td>
-                <td className="px-3 sm:px-4 py-3">
-                  <div className="flex items-center gap-2 sm:gap-3">
-                    <button onClick={() => onEdit(cat)} className="text-blue-500 hover:text-blue-700" title="تعديل">
-                      <EditIcon />
-                    </button>
-                    <button onClick={() => onDelete(cat.name)} className="text-red-500 hover:text-red-700" title="حذف">
-                      <TrashIcon />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-            {filtered.length === 0 && (
-              <tr><td colSpan={3} className="px-4 py-8 text-center text-gray-400 text-sm">لا توجد تصنيفات</td></tr>
+            {loading ? (
+              Array.from({ length: 4 }).map((_, i) => (
+                <tr key={i}>
+                  <td className="px-3 sm:px-4 py-3"><div className="h-4 w-6 bg-gray-200 rounded animate-pulse" /></td>
+                  <td className="px-3 sm:px-4 py-3"><div className="h-4 w-32 bg-gray-200 rounded animate-pulse" /></td>
+                  <td className="px-3 sm:px-4 py-3"><div className="h-4 w-16 bg-gray-200 rounded animate-pulse" /></td>
+                </tr>
+              ))
+            ) : (
+              <>
+                {filtered.map((cat, i) => (
+                  <tr key={cat.name} className="hover:bg-gray-50">
+                    <td className="px-3 sm:px-4 py-3 text-gray-400 font-medium text-xs sm:text-sm">{i + 1}</td>
+                    <td className="px-3 sm:px-4 py-3 font-medium text-gray-800 text-sm sm:text-base">{cat.name}</td>
+                    <td className="px-3 sm:px-4 py-3">
+                      <div className="flex items-center gap-2 sm:gap-3">
+                        <button onClick={() => onEdit(cat)} className="text-blue-500 hover:text-blue-700" title="تعديل">
+                          <EditIcon />
+                        </button>
+                        <button onClick={() => onDelete(cat.name)} className="text-red-500 hover:text-red-700" title="حذف">
+                          <TrashIcon />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                {filtered.length === 0 && (
+                  <tr><td colSpan={3} className="px-4 py-8 text-center text-gray-400 text-sm">لا توجد تصنيفات</td></tr>
+                )}
+              </>
             )}
           </tbody>
         </table>

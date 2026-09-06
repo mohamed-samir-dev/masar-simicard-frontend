@@ -1,4 +1,5 @@
 "use client";
+import { memo } from "react";
 import { fields } from "../constants";
 import type { CompanyData } from "../types";
 
@@ -11,17 +12,30 @@ const inputClass = "w-full border border-gray-300 rounded-lg px-3 py-2 sm:px-4 s
 
 const ltrFields = ["phone", "whatsapp", "website", "email", "taxNumber"];
 
-function FieldInput({ fieldKey, data, onChange }: { fieldKey: string; data: CompanyData; onChange: (k: string, v: string) => void }) {
+const FieldInput = memo(function FieldInput({
+  fieldKey,
+  data,
+  onChange,
+}: {
+  fieldKey: string;
+  data: CompanyData;
+  onChange: (k: string, v: string) => void;
+}) {
   const label = fields.find((f) => f.key === fieldKey)?.label;
   return (
     <div>
       <label className="block text-sm sm:text-base font-semibold text-gray-700 mb-1">{label}</label>
-      <input value={data[fieldKey] || ""} onChange={(e) => onChange(fieldKey, e.target.value)} className={inputClass} dir={ltrFields.includes(fieldKey) ? "ltr" : undefined} />
+      <input
+        value={data[fieldKey] || ""}
+        onChange={(e) => onChange(fieldKey, e.target.value)}
+        className={inputClass}
+        dir={ltrFields.includes(fieldKey) ? "ltr" : undefined}
+      />
     </div>
   );
-}
+});
 
-export default function CompanyFields({ data, onChange }: CompanyFieldsProps) {
+const CompanyFields = memo(function CompanyFields({ data, onChange }: CompanyFieldsProps) {
   return (
     <div className="space-y-4 sm:space-y-5">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-5">
@@ -43,7 +57,11 @@ export default function CompanyFields({ data, onChange }: CompanyFieldsProps) {
         {["taxNumber", "shippingCompany"].map((k) => <FieldInput key={k} fieldKey={k} data={data} onChange={onChange} />)}
         <div>
           <label className="block text-sm sm:text-base font-semibold text-gray-700 mb-1">طريقة الدفع</label>
-          <select value={data.paymentMethod || ""} onChange={(e) => onChange("paymentMethod", e.target.value)} className={inputClass}>
+          <select
+            value={data.paymentMethod || ""}
+            onChange={(e) => onChange("paymentMethod", e.target.value)}
+            className={inputClass}
+          >
             <option value="حوالات بنكية فقط">حوالات بنكية فقط</option>
             <option value="بطاقة بنكية فقط">بطاقة بنكية فقط</option>
           </select>
@@ -51,9 +69,15 @@ export default function CompanyFields({ data, onChange }: CompanyFieldsProps) {
       </div>
       <div>
         <label className="block text-sm sm:text-base font-semibold text-gray-700 mb-1">التفاصيل</label>
-        <textarea value={data.details || ""} onChange={(e) => onChange("details", e.target.value)}
-          rows={3} className={inputClass} />
+        <textarea
+          value={data.details || ""}
+          onChange={(e) => onChange("details", e.target.value)}
+          rows={3}
+          className={inputClass}
+        />
       </div>
     </div>
   );
-}
+});
+
+export default CompanyFields;
