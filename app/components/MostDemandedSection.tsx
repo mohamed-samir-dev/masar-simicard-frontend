@@ -17,10 +17,9 @@ export default function MostDemandedSection() {
   ];
 
   useEffect(() => {
-    const BASE = process.env.NEXT_PUBLIC_API_URL || "";
     Promise.all(
       IDS.map((id) =>
-        fetch(`${BASE}/api/products/${id}`)
+        fetch(`/api/products/${id}`)
           .then((r) => r.json())
           .then((data) => (data && data._id ? data : null))
           .catch(() => null)
